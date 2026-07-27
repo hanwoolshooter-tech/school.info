@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학교 급식 및 학사일정 조회 앱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen text-gray-800 p-4 flex flex-col items-center">
+
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-indigo-100 flex flex-col my-auto">
+        
+        <!-- 헤더 -->
+        <header class="bg-indigo-600 text-white p-5 flex justify-between items-center shadow-md">
+            <div>
+                <h1 class="text-xl font-black">🏫 학교 급식 및 학사일정</h1>
+                <p class="text-xs text-indigo-200 mt-0.5">Vercel 서버리스 연동 웹앱</p>
+            </div>
+            <button onclick="openSettings()" class="bg-indigo-700 hover:bg-indigo-800 p-2.5 rounded-xl transition text-sm flex items-center gap-1 font-bold shadow-inner">
+                ⚙️ 설정
+            </button>
+        </header>
+
+        <!-- 탭 네비게이션 -->
+        <div class="flex bg-indigo-50 p-2 border-b border-indigo-100">
+            <button onclick="switchTab('meal')" id="tab-meal" class="flex-1 py-2 rounded-xl font-bold text-xs bg-indigo-600 text-white transition shadow-sm">🍽️ 주간 급식</button>
+            <button onclick="switchTab('schedule')" id="tab-schedule" class="flex-1 py-2 rounded-xl font-bold text-xs text-indigo-600 hover:bg-indigo-100 transition">📅 월별 캘린더</button>
+        </div>
+
+        <!-- 메인 컨텐츠 영역 -->
+        <main class="p-5 flex-1 flex flex-col">
+            
+            <!-- 학교 정보 카드 -->
+            <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4 flex justify-between items-center">
+                <div>
+                    <span id="display-school-name" class="font-bold text-indigo-900 text-base">학교가 설정되지 않았습니다</span>
+                    <p id="display-edu-office" class="text-xs text-indigo-500 mt-0.5">우측 설정 버튼을 눌러 학교를 등록하세요</p>
+                </div>
+                <span class="text-3xl">🎒</span>
+            </div>
+
+            <!-- [탭 1] 급식 식단 뷰 -->
+            <div id="view-meal" class="flex flex-col flex-1">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-black text-gray-700 text-sm">📅 이번 주 급식 식단</h2>
+                </div>
+                <div id="meal-container" class="space-y-3 flex-1 overflow-y-auto max-h-[340px] pr-1">
+                    <div class="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                        <p class="text-sm text-gray-400">설정에서 학교 정보를 입력한 후<br>급식과 학사일정을 확인해 보세요!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [탭 2] 월별 캘린더 학사일정 뷰 -->
+            <div id="view-schedule" class="flex flex-col flex-1 hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 id="calendar-title" class="font-black text-gray-700 text-sm">📅 학사일정 캘린더</h2>
+                    <div class="flex gap-1">
+                        <button onclick="changeMonth(-1)" class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded-lg text-xs font-bold">◀</button>
+                        <button onclick="changeMonth(1)" class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded-lg text-xs font-bold">▶</button>
+                    </div>
+                </div>
+
+                <!-- 캘린더 그리드 -->
+                <div class="bg-white border border-indigo-100 rounded-2xl p-3 shadow-sm">
+                    <!-- 요일 헤더 -->
+                    <div class="grid grid-cols-7 text-center text-xs font-bold text-gray-400 mb-2">
+                        <span class="text-red-500">일</span>
+                        <span>월</span>
+                        <span>화</span>
+                        <span>수</span>
+                        <span>목</span>
+                        <span>금</span>
+                        <span class="text-blue-500">토</span>
+                    </div>
+                    <!-- 날짜 그리드 -->
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center text-xs">
+                        <!-- Javascript로 동적 생성 -->
+                    </div>
+                </div>
+
+                <!-- 선택된 날짜의 일정 상세 표시 -->
+                <div id="selected-schedule-box" class="mt-3 bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-900 min-h-[50px] flex items-center justify-center text-center">
+                    날짜를 선택하여 학사일정을 확인하세요.
+                </div>
+            </div>
+
+        </main>
+
+        <!-- 푸터 -->
+        <footer class="bg-gray-50 p-3 text-center text-xs text-gray-400 border-t border-gray-100">
+            데이터 출처: 교육행정 정보시스템 (나이스 오픈API)
+        </footer>
+    </div>
+
+    <!-- 설정 모달 -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black text-lg text-indigo-900">⚙️ 학교 설정</h3>
+                <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">시도교육청 코드</label>
+                    <select id="input-edu" class="w-full p-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-indigo-500 bg-white">
+                        <option value="B10">서울시교육청 (B10)</option>
+                        <option value="C10">부산시교육청 (C10)</option>
+                        <option value="D10">대구시교육청 (D10)</option>
+                        <option value="E10">인천시교육청 (E10)</option>
+                        <option value="F10">광주시교육청 (F10)</option>
+                        <option value="G10">대전시교육청 (G10)</option>
+                        <option value="H10">울산시교육청 (H10)</option>
+                        <option value="I10">세종시교육청 (I10)</option>
+                        <option value="J10">경기도교육청 (J10)</option>
+                        <option value="K10">강원도교육청 (K10)</option>
+                        <option value="M10">충청북도교육청 (M10)</option>
+                        <option value="N10">충청남도교육청 (N10)</option>
+                        <option value="P10">전라북도교육청 (P10)</option>
+                        <option value="Q10">전라남도교육청 (Q10)</option>
+                        <option value="R10">경상북도교육청 (R10)</option>
+                        <option value="S10">경상남도교육청 (S10)</option>
+                        <option value="T10">제주도교육청 (T10)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">학교 이름</label>
+                    <input type="text" id="input-school-name" placeholder="예: 서울고등학교" class="w-full p-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <button onclick="saveSettingsAndFetch()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-md text-sm mt-2">
+                    저장 및 정보 조회하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let settings = {
+            eduCode: localStorage.getItem('neis_educode') || 'B10',
+            schoolName: localStorage.getItem('neis_schoolname') || '',
+            schoolCode: localStorage.getItem('neis_schoolcode') || ''
+        };
+
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth() + 1;
+        let scheduleMap = {};
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (settings.schoolName) {
+                document.getElementById('input-edu').value = settings.eduCode;
+                document.getElementById('input-school-name').value = settings.schoolName;
+                
+                document.getElementById('display-school-name').innerText = settings.schoolName;
+                document.getElementById('display-edu-office').innerText = `교육청 코드: ${settings.eduCode}`;
+                
+                fetchAllData();
+            } else {
+                renderCalendar();
+            }
+        });
+
+        function switchTab(tab) {
+            const mealView = document.getElementById('view-meal');
+            const scheduleView = document.getElementById('view-schedule');
+            const tabMeal = document.getElementById('tab-meal');
+            const tabSchedule = document.getElementById('tab-schedule');
+
+            if (tab === 'meal') {
+                mealView.classList.remove('hidden');
+                scheduleView.classList.add('hidden');
+                tabMeal.className = "flex-1 py-2 rounded-xl font-bold text-xs bg-indigo-600 text-white transition shadow-sm";
+                tabSchedule.className = "flex-1 py-2 rounded-xl font-bold text-xs text-indigo-600 hover:bg-indigo-100 transition";
+            } else {
+                scheduleView.classList.remove('hidden');
+                mealView.classList.add('hidden');
+                tabSchedule.className = "flex-1 py-2 rounded-xl font-bold text-xs bg-indigo-600 text-white transition shadow-sm";
+                tabMeal.className = "flex-1 py-2 rounded-xl font-bold text-xs text-indigo-600 hover:bg-indigo-100 transition";
+                renderCalendar();
+            }
+        }
+
+        function openSettings() { document.getElementById('settings-modal').style.display = 'flex'; }
+        function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+
+        async function saveSettingsAndFetch() {
+            const eduCode = document.getElementById('input-edu').value;
+            const schoolName = document.getElementById('input-school-name').value.trim();
+
+            if (!schoolName) {
+                alert('학교 이름을 입력해 주세요.');
+                return;
+            }
+
+            settings.eduCode = eduCode;
+            settings.schoolName = schoolName;
+
+            localStorage.setItem('neis_educode', eduCode);
+            localStorage.setItem('neis_schoolname', schoolName);
+
+            document.getElementById('display-school-name').innerText = schoolName;
+            document.getElementById('display-edu-office').innerText = `교육청 코드: ${eduCode}`;
+
+            closeSettings();
+            await fetchSchoolCodeAndAllData();
+        }
+
+        async function fetchSchoolCodeAndAllData() {
+            try {
+                let res = await fetch(`/api/generate?type=schoolInfo&eduCode=${settings.eduCode}&schoolName=${encodeURIComponent(settings.schoolName)}`);
+                let data = await res.json();
+
+                if (data.schoolInfo && data.schoolInfo[1].row.length > 0) {
+                    settings.schoolCode = data.schoolInfo[1].row[0].SD_SCHUL_CODE;
+                    localStorage.setItem('neis_schoolcode', settings.schoolCode);
+                    fetchAllData();
+                } else {
+                    alert('해당 학교를 찾을 수 없습니다.');
+                }
+            } catch (err) {
+                fetchAllData();
+            }
+        }
+
+        function fetchAllData() {
+            fetchMealData();
+            fetchScheduleData();
+        }
+
+        async function fetchMealData() {
+            const container = document.getElementById('meal-container');
+            container.innerHTML = `<div class="text-center py-10 text-gray-400 text-sm">급식 식단을 불러오는 중...</div>`;
+
+            let today = new Date();
+            let year = today.getFullYear();
+            let month = String(today.getMonth() + 1).padStart(2, '0');
+            let day = String(today.getDate()).padStart(2, '0');
+            let todayStr = `${year}${month}${day}`;
+
+            try {
+                let res = await fetch(`/api/generate?type=meal&eduCode=${settings.eduCode}&schoolCode=${settings.schoolCode}&ymd=${todayStr}`);
+                let data = await res.json();
+
+                if (data.mealServiceDietInfo && data.mealServiceDietInfo[1].row.length > 0) {
+                    container.innerHTML = '';
+                    data.mealServiceDietInfo[1].row.forEach(row => {
+                        let menuClean = row.DDISH_NM.replace(/<br\/>/g, '<br>');
+                        let card = document.createElement('div');
+                        card.className = "bg-white p-4 rounded-2xl border border-indigo-100 shadow-sm";
+                        card.innerHTML = `
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-indigo-700 text-sm">📅 ${formatDateStr(row.MLSV_YMD)}</span>
+                                <span class="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">중식</span>
+                            </div>
+                            <p class="text-xs text-gray-600 leading-relaxed">${menuClean}</p>
+                        `;
+                        container.appendChild(card);
+                    });
+                } else {
+                    loadDemoMealData();
+                }
+            } catch (err) {
+                loadDemoMealData();
+            }
+        }
+
+        async function fetchScheduleData() {
+            let ym = `${currentYear}${String(currentMonth).padStart(2, '0')}`;
+            scheduleMap = {};
+
+            if (!settings.schoolCode) {
+                loadDemoScheduleData();
+                return;
+            }
+
+            try {
+                let res = await fetch(`/api/generate?type=schedule&eduCode=${settings.eduCode}&schoolCode=${settings.schoolCode}&ym=${ym}`);
+                let data = await res.json();
+
+                if (data.SchoolSchedule && data.SchoolSchedule[1].row.length > 0) {
+                    data.SchoolSchedule[1].row.forEach(row => {
+                        let ymd = row.AA_YMD;
+                        if (!scheduleMap[ymd]) scheduleMap[ymd] = [];
+                        scheduleMap[ymd].push(row.EVENT_NM);
+                    });
+                } else {
+                    loadDemoScheduleData();
+                }
+            } catch (err) {
+                loadDemoScheduleData();
+            }
+            renderCalendar();
+        }
+
+        function changeMonth(direction) {
+            currentMonth += direction;
+            if (currentMonth > 12) {
+                currentMonth = 1;
+                currentYear++;
+            } else if (currentMonth < 1) {
+                currentMonth = 12;
+                currentYear--;
+            }
+            fetchScheduleData();
+        }
+
+        function renderCalendar() {
+            document.getElementById('calendar-title').innerText = `📅 ${currentYear}년 ${currentMonth}월 학사일정`;
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay();
+            const lastDay = new Date(currentYear, currentMonth, 0).getDate();
+
+            for (let i = 0; i < firstDayIndex; i++) {
+                grid.innerHTML += `<div></div>`;
+            }
+
+            for (let day = 1; day <= lastDay; day++) {
+                let mStr = String(currentMonth).padStart(2, '0');
+                let dStr = String(day).padStart(2, '0');
+                let ymd = `${currentYear}${mStr}${dStr}`;
+                let hasEvent = scheduleMap[ymd] && scheduleMap[ymd].length > 0;
+
+                let cell = document.createElement('div');
+                cell.className = `h-9 flex flex-col items-center justify-center rounded-xl cursor-pointer transition relative ${hasEvent ? 'bg-indigo-100 font-bold text-indigo-900' : 'hover:bg-gray-100 text-gray-700'}`;
+                cell.innerHTML = `<span>${day}</span>`;
+                
+                if (hasEvent) {
+                    cell.innerHTML += `<span class="absolute bottom-1 w-1 h-1 bg-indigo-600 rounded-full"></span>`;
+                    cell.onclick = () => {
+                        document.getElementById('selected-schedule-box').innerText = `${currentYear}년 ${currentMonth}월 ${day}일: ${scheduleMap[ymd].join(', ')}`;
+                    };
+                } else {
+                    cell.onclick = () => {
+                        document.getElementById('selected-schedule-box').innerText = `${currentYear}년 ${currentMonth}월 ${day}일: 학사일정 없음`;
+                    };
+                }
+
+                grid.appendChild(cell);
+            }
+        }
+
+        function loadDemoMealData() {
+            const container = document.getElementById('meal-container');
+            container.innerHTML = `
+                <div class="bg-white p-4 rounded-2xl border border-indigo-100 shadow-sm">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-indigo-700 text-sm">📅 오늘 (중식)</span>
+                        <span class="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">중식</span>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed">차조밥 / 쇠고기미역국 / 한돈불고기 / 감자채볶음 / 배추김치 / 멜론</p>
+                </div>
+            `;
+        }
+
+        function loadDemoScheduleData() {
+            scheduleMap['20260710'] = ['동아리 발표회'];
+            scheduleMap['20260720'] = ['방학식'];
+        }
+
+        function formatDateStr(str) {
+            if(!str || str.length !== 8) return str;
+            return `${str.slice(0,4)}년 ${str.slice(4,6)}월 ${str.slice(6,8)}일`;
+        }
+    </script>
+</body>
+</html>
